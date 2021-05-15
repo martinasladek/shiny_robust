@@ -1,0 +1,110 @@
+---
+title: "script notes"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(ggplot2)
+library(magrittr)
+
+viridis <- readRDS("../objects/viridis.rds")
+
+```
+
+## 1. Build a functionality to upload a data file 
+
+This will only be needed locally as a temp and can be be reset when the session ends (therefore the file doesn't need to go through drop box)
+
+Generate data for testing
+
+```{r}
+x = rep(1:100, 2) + rnorm(100*2, mean = 0, sd = 1)
+b0 = 10
+b1 = 2.4
+sigma2 = x^2.3
+residual = rnorm(x, mean = 0, sd = sqrt(sigma2))
+y = b0 + b1*x + residual
+
+robust_test_data <- 
+  tibble::tibble(
+    x = x, 
+    y = y
+  )
+```
+
+
+```{r}
+lm(y ~ x, robust_test_data) %>% summary()
+```
+
+```{r}
+robustbase::lmrob(y ~ x, robust_test_data) %>% summary()
+```
+
+```{r}
+robust_test_data %<>% 
+  dplyr::transmute(
+    time = x, 
+    insanity = y
+  )
+```
+
+```{r}
+# write.csv(robust_test_data, 
+#           "../data/robust_test_data.csv", row.names = FALSE)
+```
+
+## Render model output 
+
+```{r}
+mod_1 <- lm(y ~ x, data = robust_test_data)
+mod_2 <- robustbase::lmrob(y ~ x, data = robust_test_data)
+
+model_output <- function(model) {
+  
+  summary(model)$coefficients %>% 
+    as.data.frame() %>% 
+    tibble::rownames_to_column() %>% 
+    dplyr::rename(
+      Coefficient = rowname
+    )
+  
+}
+```
+
+
+```{r}
+robust_test_data %<>% 
+  tibble::rownames_to_column()
+```
+
+## Render plot 
+
+get predicted values for plotting 
+
+```{r}
+pred_lm <- predict(mod_1, interval = "confidence") %>% 
+  as.data.frame() %>% 
+  tibble::rownames_to_column()
+
+pred_lmrob <- predict(mod_2, interval = "confidence") %>% 
+  as.data.frame() %>% 
+  tibble::rownames_to_column()
+
+robust_test_data %<>%
+  dplyr::left_join(., pred_lm, by = "rowname") %>% 
+  dplyr::left_join(., pred_lmrob, by = "rowname")
+
+```
+
+
+```{r}
+ggplot2::ggplot(data = robust_test_data, aes(x = time, y = insanity)) + 
+  geom_point(colour = viridis$blue_3, alpha = 0.5) + 
+  geom_line(aes(y = fit.x), size = 1, colour = viridis$purple_1) + 
+  geom_line(aes(y = fit.y), size = 1, colour = viridis$green_1) + 
+  theme_minimal()
+```
+
