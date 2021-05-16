@@ -38,8 +38,12 @@ ui <- dashboardPage(
             tabItem(tabName = "robust_regression", 
                     fluidRow(
                         column(2,
-                               varSelectInput(inputId = "outcome", label = "Outcome:", data = NULL, multiple = TRUE), 
-                               varSelectInput(inputId = "predictor", label = "Predictor(s):", data = NULL, multiple = TRUE),
+                               selectInput(inputId = "outcome", label = "Outcome:", 
+                                           choices = NULL, multiple = FALSE), 
+                               selectInput(inputId = "predictor", label = "Predictor(s):",
+                                           choices = NULL, multiple = TRUE),
+                               br(), 
+                               br(),
                                fluidRow(
                                    actionButton(inputId = "run_analysis", label = "Run (to the hills...)"), 
                                    align = "center"
@@ -66,6 +70,10 @@ ui <- dashboardPage(
                                    box(
                                        plotOutput(outputId = "lm_plot"), 
                                        width = 12
+                                   ), 
+                                   box(
+                                       htmlOutput(outputId = "debug_box"), 
+                                       width = 12
                                    )
                                )
                         )
@@ -84,11 +92,10 @@ server <- function(input, output) {
     
     observe({
         req(input$upload_data)
-        rvs$data <- read.csv(input$upload_data$datapath) %>% 
-            tibble::rownames_to_column()
+        rvs$data <- read.csv(input$upload_data$datapath)
         
-        updateVarSelectInput(inputId = "outcome", data = rvs$data)
-        updateVarSelectInput(inputId = "predictor", data = rvs$data)
+        updateSelectInput(inputId = "outcome", choices = names(rvs$data))
+        updateSelectInput(inputId = "predictor", choices = names(rvs$data))
     })
     
     
@@ -127,22 +134,27 @@ server <- function(input, output) {
         
 
         pred_lm <- predict(lm_model, interval = "confidence") %>%
-            as.data.frame() %>%
-            tibble::rownames_to_column()
+            as.data.frame()
 
         pred_lmrob <- predict(lmrob_model, interval = "confidence") %>%
-            as.data.frame() %>%
-            tibble::rownames_to_column()
-    
+            as.data.frame() 
+        
         
         output$lm_plot <- renderPlot({
 
-            ggplot2::ggplot(data = rvs$data, aes()) +
-                #geom_point(colour = viridis$blue_3, alpha = 0.5) +
-                #geom_line(aes(y = pred_lm$fit), size = 1, colour = viridis$purple_1) +
-                #geom_line(aes(y = pred_lmrob$fit), size = 1, colour = viridis$green_1) +
+            ggplot2::ggplot(data = rvs$data, aes(x = get(input$predictor), 
+                                                 y = get(input$outcome))) +
+                geom_point(colour = viridis$blue_3, alpha = 0.5) +
+                #geom_line(data = pred_lm, aes(y = fit), size = 1, colour = viridis$purple_1) +
+                #geom_line(data = pred_lmrob, aes(y = fit), size = 1, colour = viridis$green_1) +
                 theme_minimal()
 
+        })
+        
+        output$debug_box <- renderUI({
+            HTML(print(
+                class(input$predictor)
+                ))
         })
 
     })
