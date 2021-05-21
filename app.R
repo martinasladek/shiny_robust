@@ -10,7 +10,7 @@ source("../shiny_robust/scripts/helpers.R")
 viridis <- readRDS("../shiny_robust/objects/viridis.rds")
 
 # Define UI for application that draws a histogram
-ui <- dashboardPage(
+ui <- dashboardPage( 
     
     # Application title
     header = dashboardHeader(title = "Robust Statistics"),
