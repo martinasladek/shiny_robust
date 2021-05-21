@@ -108,3 +108,77 @@ ggplot2::ggplot(data = robust_test_data, aes(x = time, y = insanity)) +
   theme_minimal()
 ```
 
+# Fitting models with multiple predictors
+
+```{r}
+multiple_pred <- robust_test_data %>% 
+  dplyr::arrange(insanity) %>% 
+  dplyr::mutate(
+    dogs = sort(insanity, decreasing = TRUE) + rnorm(n = nrow(.), mean = 0, sd = 20), 
+    course = c(rep("ba", 67), rep("msc", 67), rep("phd", 66))
+  )
+```
+
+```{r}
+write.csv(multiple_pred, "../data/multiple_pred.csv", row.names = FALSE)
+```
+
+
+```{r}
+lm(insanity ~ time + dogs + course + time:dogs, data = multiple_pred) %>% summary()
+
+interaction = list("time", "dogs", "+", "+", "course", "insanity")
+stringr::str_sub(interaction[length(interaction)], -1)
+```
+
+```{r}
+interaction = list("time", "dogs", "+", "course", "insanity", "+", "course", "dogs")
+
+int_string <- paste0(interaction, collapse = " ")
+int_vector <- strsplit(int_string, " [+] ")[[1]] %>% 
+  stringr::str_remove_all(., pattern = "[+][ +]")
+
+add_double_colon <- function(x){
+  stringr::str_replace_all(string = x, pattern = " ", replacement = ":")
+}
+
+purrr::map(.x = int_vector, .f = add_double_colon) %>% 
+  paste0(., collapse = " + ")
+
+```
+
+```{r}
+check_multi_plus <- function(interaction_input){
+  
+  check_multi_plus_tib <- 
+    tibble::tibble(
+      int_original = interaction %>% paste(), 
+      int_lead = dplyr::lead(interaction) %>% paste(), 
+      is_plus = dplyr::if_else(int_original == "+" & int_lead == "+", 1, 0)
+    )
+  
+  any(check_multi_plus_tib$is_plus == 1)
+  
+}
+
+check_multi_plus(interaction)
+```
+
+```{r}
+process_int_string <- function(interaction_input){
+  
+  int_string = paste0(interaction_input, collapse = " ")
+  
+  int_vector = strsplit(int_string, " [+] ")[[1]] %>% 
+    stringr::str_remove_all(., pattern = "[+][ +]")
+  
+  purrr::map(.x = int_vector, .f = add_double_colon) %>% 
+    paste0(., collapse = " + ")
+  
+}
+```
+
+```{r}
+rep(c("dog", "course", "+"), 4)
+```
+

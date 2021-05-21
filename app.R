@@ -42,6 +42,13 @@ ui <- dashboardPage(
                                            choices = NULL, multiple = FALSE), 
                                selectInput(inputId = "predictor", label = "Predictor(s):",
                                            choices = NULL, multiple = TRUE),
+                               numericInput(inputId = "n_interactions", label = "Number of interactions", value = 1),
+                               selectInput(inputId = "interaction", label = "Interaction term(s):",
+                                           choices = NULL, multiple = TRUE, 
+                                            # options = list(
+                                            #     create = TRUE 
+                                            #     )
+                                           ),
                                br(), 
                                br(),
                                fluidRow(
@@ -67,10 +74,10 @@ ui <- dashboardPage(
                         ), 
                         column(5, 
                                fluidRow(
-                                   box(
-                                       plotOutput(outputId = "lm_plot"), 
-                                       width = 12
-                                   ), 
+                                   # box(
+                                   #     plotOutput(outputId = "lm_plot"), 
+                                   #     width = 12
+                                   # ), 
                                    box(
                                        htmlOutput(outputId = "debug_box"), 
                                        width = 12
@@ -88,14 +95,16 @@ ui <- dashboardPage(
 server <- function(input, output) {
 
     # Upload data and save as a reactive value
-    rvs <- reactiveValues(data = NULL)
+    rvs <- reactiveValues(data = NULL, n_interactions = 1)
     
     observe({
         req(input$upload_data)
         rvs$data <- read.csv(input$upload_data$datapath)
+        rvs$n_interactions <- input$n_interactions
         
         updateSelectInput(inputId = "outcome", choices = names(rvs$data))
         updateSelectInput(inputId = "predictor", choices = names(rvs$data))
+        updateSelectInput(inputId = "interaction", choices = rep(c(names(rvs$data), "+"), rvs$n_interactions))
     })
     
     
@@ -116,47 +125,65 @@ server <- function(input, output) {
     # Run linear model 
     observe({
         
-        req(input$run_analysis)
+        req(input$run_analysis, input$predictor)
         
-        formula = paste0(input$outcome, "~", input$predictor)
+        if(is.null(input$interaction)){
+            interaction = ""
+        } else if(stringr::str_sub(input$interaction[length(input$interaction)], -1) == "+") {
+            interaction = ""
+        } else if(check_multi_plus(input$interaction) == TRUE){
+            interaction == ""
+        } else {
+            interaction = paste0("+", 
+                                 process_int_string(input$interaction)
+            )
+        }
+        
+        
+        formula = paste0(
+            input$outcome, "~", 
+            paste0(input$predictor, collapse = "+"), 
+            interaction
+        )
         
         # fit OLS model 
-        lm_model <- lm(formula = as.formula(formula), data = rvs$data)
+        lm_model <- lm(formula = formula(paste(formula, collapse = " ")), data = rvs$data)
         output$lm_output <- renderTable({
             model_output(lm_model)
         }, digits = 4)
         
         # fit robust model 
-        lmrob_model <- robustbase::lmrob(formula = as.formula(formula), data = rvs$data)
+        lmrob_model <- robustbase::lmrob(formula(paste(formula, collapse = " ")), data = rvs$data, setting = "KS2014")
         output$lmrob_output <- renderTable({
             model_output(lmrob_model)
         }, digits = 4)
         
-
-        pred_lm <- predict(lm_model, interval = "confidence") %>%
-            as.data.frame()
-
-        pred_lmrob <- predict(lmrob_model, interval = "confidence") %>%
-            as.data.frame() 
+        # pred_lm <- predict(lm_model, interval = "confidence") %>%
+        #     as.data.frame()
+        # 
+        # pred_lmrob <- predict(lmrob_model, interval = "confidence") %>%
+        #     as.data.frame() 
         
         
-        output$lm_plot <- renderPlot({
-
-            ggplot2::ggplot(data = rvs$data, aes(x = get(input$predictor), 
-                                                 y = get(input$outcome))) +
-                geom_point(colour = viridis$blue_3, alpha = 0.5) +
-                #geom_line(data = pred_lm, aes(y = fit), size = 1, colour = viridis$purple_1) +
-                #geom_line(data = pred_lmrob, aes(y = fit), size = 1, colour = viridis$green_1) +
-                theme_minimal()
-
-        })
+        # output$lm_plot <- renderPlot({
+        # 
+        #     ggplot2::ggplot(data = rvs$data, aes(x = get(input$predictor), 
+        #                                          y = get(input$outcome))) +
+        #         geom_point(colour = viridis$blue_3, alpha = 0.5) +
+        #         #geom_line(data = pred_lm, aes(y = fit), size = 1, colour = viridis$purple_1) +
+        #         #geom_line(data = pred_lmrob, aes(y = fit), size = 1, colour = viridis$green_1) +
+        #         theme_minimal()
+        # 
+        # })
         
         output$debug_box <- renderUI({
-            HTML(print(
-                class(input$predictor)
-                ))
+            HTML(
+                paste0(
+                    interaction
+                )
+            )
         })
-
+        
     })
     
     
