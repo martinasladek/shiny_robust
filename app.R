@@ -42,13 +42,13 @@ ui <- dashboardPage(
                                            choices = NULL, multiple = FALSE), 
                                selectInput(inputId = "predictor", label = "Predictor(s):",
                                            choices = NULL, multiple = TRUE),
-                               numericInput(inputId = "n_interactions", label = "Number of interactions", value = 1),
-                               selectInput(inputId = "interaction", label = "Interaction term(s):",
-                                           choices = NULL, multiple = TRUE, 
-                                            # options = list(
-                                            #     create = TRUE 
-                                            #     )
-                                           ),
+                               #numericInput(inputId = "n_interactions", label = "Number of interactions", value = 1),
+                               # selectInput(inputId = "interaction", label = "Interacting variables",
+                               #             choices = NULL, multiple = TRUE, 
+                               #             ),
+                               uiOutput(outputId = "selectContainer"), 
+                               verbatimTextOutput("val"),
+                               actionButton("reset", "Reset"),
                                br(), 
                                br(),
                                fluidRow(
@@ -95,18 +95,35 @@ ui <- dashboardPage(
 server <- function(input, output) {
 
     # Upload data and save as a reactive value
-    rvs <- reactiveValues(data = NULL, n_interactions = 1)
+    rvs <- reactiveValues(data = NULL, choices = NULL)
+    chosen <- reactiveVal(c())
+    observeEvent(input$reset, chosen(c()))
+    
     
     observe({
         req(input$upload_data)
         rvs$data <- read.csv(input$upload_data$datapath)
-        rvs$n_interactions <- input$n_interactions
+        rvs$choices <- names(rvs$data)
+        #rvs$n_interactions <- input$n_interactions
+        #rvs$int_options <- rep(names(rvs$data), times = rvs$n_interactions)
         
         updateSelectInput(inputId = "outcome", choices = names(rvs$data))
         updateSelectInput(inputId = "predictor", choices = names(rvs$data))
-        updateSelectInput(inputId = "interaction", choices = rep(c(names(rvs$data), "+"), rvs$n_interactions))
+        #updateSelectInput(inputId = "interaction", choices = names(rvs$data))
     })
     
+    output$selectContainer <- renderUI({
+        # Take a dependency on chosen to re-render when an option is selected.
+        chosen()
+        selectInput(inputId = "interaction", label = "Interacting variables",
+                    choices = rvs$choices, multiple = TRUE, selectize = FALSE
+        )
+    })
+    
+    observeEvent(input$interaction, {
+        chosen(c(chosen(), input$interaction))
+    })
+    output$val <- renderPrint(chosen())
     
     # Display data 
     output$display_data <- renderDataTable({
@@ -176,10 +193,18 @@ server <- function(input, output) {
         # 
         # })
         
+        output$interaction_terms <- renderUI({
+            HTML(
+                paste0(
+                    
+                )
+            )
+        })
+        
         output$debug_box <- renderUI({
             HTML(
                 paste0(
-                    interaction
+                    rvs$int_options
                 )
             )
         })

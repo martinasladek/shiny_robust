@@ -120,7 +120,7 @@ multiple_pred <- robust_test_data %>%
 ```
 
 ```{r}
-write.csv(multiple_pred, "../data/multiple_pred.csv", row.names = FALSE)
+#write.csv(multiple_pred, "../data/multiple_pred.csv", row.names = FALSE)
 ```
 
 
@@ -180,5 +180,7 @@ process_int_string <- function(interaction_input){
 
 ```{r}
 rep(c("dog", "course", "+"), 4)
+
+rep(c(names(rvs$data), "+"), times = rvs$n_interactions)
 ```
 
