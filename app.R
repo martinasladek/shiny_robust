@@ -2,8 +2,10 @@
 library(DT)
 library(ggplot2)
 library(magrittr)
+library(palmerpenguins)
 library(shiny)
 library(shinydashboard)
+library(shinyjs)
 
 source("../shiny_robust/scripts/helpers.R") 
 
@@ -12,6 +14,8 @@ viridis <- readRDS("../shiny_robust/objects/viridis.rds")
 # Define UI for application that draws a histogram
 ui <- dashboardPage( 
     
+    shinyjs::useShinyjs(),
+    
     # Application title
     header = dashboardHeader(title = "Robust Statistics"),
     
@@ -19,7 +23,7 @@ ui <- dashboardPage(
     sidebar = dashboardSidebar(
         sidebarMenu(id = "sidebar_menu",
                     menuItem("Data", tabName = "data", icon = icon("archive")),
-                    menuItem("Robust regression", tabName = "robust_regression", icon = icon("chart-line"))
+                    menuItem("Robust linear model", tabName = "robust_regression", icon = icon("chart-line"))
         )
     ), 
     
@@ -29,6 +33,8 @@ ui <- dashboardPage(
             tabItem(tabName = "data", 
                     fluidRow(
                         fileInput(inputId = "upload_data","Upload data", accept = ".csv"), 
+                        actionButton(inputId = "load_demo_data", "Load demo data"),
+                        actionButton(inputId = "reset_data", "Reset data"),
                         align = "center"
                     ), 
                     fluidRow(
@@ -37,51 +43,62 @@ ui <- dashboardPage(
             ), 
             tabItem(tabName = "robust_regression", 
                     fluidRow(
-                        column(2,
-                               selectInput(inputId = "outcome", label = "Outcome:", 
-                                           choices = NULL, multiple = FALSE), 
-                               selectInput(inputId = "predictor", label = "Predictor(s):",
-                                           choices = NULL, multiple = TRUE),
-                               #numericInput(inputId = "n_interactions", label = "Number of interactions", value = 1),
-                               # selectInput(inputId = "interaction", label = "Interacting variables",
-                               #             choices = NULL, multiple = TRUE, 
-                               #             ),
-                               uiOutput(outputId = "selectContainer"), 
-                               verbatimTextOutput("val"),
-                               actionButton("reset", "Reset"),
-                               br(), 
-                               br(),
-                               fluidRow(
-                                   actionButton(inputId = "run_analysis", label = "Run (to the hills...)"), 
-                                   align = "center"
-                               ),
+                        column(4,
+                               box(
+                                   selectInput(inputId = "outcome", label = "Outcome:", 
+                                               choices = NULL, multiple = FALSE), 
+                                   selectInput(inputId = "predictor", label = "Predictor(s):",
+                                               choices = NULL, multiple = TRUE),
+                                   uiOutput(outputId = "interaction_vars"), 
+                                   br(),
+                                   fluidRow(
+                                       actionButton("add_interaction", "Next interaction"),
+                                       actionButton("reset", "Reset"), 
+                                       align = "center"
+                                   ),
+                                   br(),
+                                   htmlOutput("interaction_terms"),
+                                   br(),
+                                   # fluidRow(
+                                   #     actionButton(inputId = "run_analysis", label = "Run analysis"), 
+                                   #     align = "center"
+                                   # ),
+                                   width = 12
+                               ), 
+                               box(
+                                   htmlOutput(outputId = "code_box"), 
+                                   tags$style(HTML("
+                                          code {
+                                            color: #007aa6;
+                                            background-color: white;
+                                          } 
+                                       ")),
+                                   width = 12
+                               )
                         ), 
-                        column(5, 
+                        column(8, 
                                fluidRow(
                                    box(
                                        tableOutput(outputId = "lmrob_output"), 
                                        title = "Robust model", solidHeader = FALSE, status = "primary", 
-                                       width = 12
+                                       width = 10
                                    )
                                ),
                                fluidRow(
                                    box(
                                        tableOutput(outputId = "lm_output"), 
                                        title = "OLS model", solidHeader = FALSE, status = "primary", 
-                                       width = 12
+                                       width = 10
                                    )
                                )
                         ), 
-                        column(5, 
+                        column(4, 
                                fluidRow(
                                    # box(
                                    #     plotOutput(outputId = "lm_plot"), 
                                    #     width = 12
                                    # ), 
-                                   box(
-                                       htmlOutput(outputId = "debug_box"), 
-                                       width = 12
-                                   )
+                                   
                                )
                         )
                     )
@@ -95,35 +112,63 @@ ui <- dashboardPage(
 server <- function(input, output) {
 
     # Upload data and save as a reactive value
-    rvs <- reactiveValues(data = NULL, choices = NULL)
-    chosen <- reactiveVal(c())
-    observeEvent(input$reset, chosen(c()))
+    rvs <- reactiveValues(data = NULL, variables = NULL, interaction = NULL, interaction_display = NULL)
+    chosen_vars <- reactiveVal(c())
     
-    
+    observeEvent(input$reset, chosen_vars(c()))
+ 
     observe({
+        if(input$load_demo_data != 0){shinyjs::disable("upload_data")}
         req(input$upload_data)
         rvs$data <- read.csv(input$upload_data$datapath)
-        rvs$choices <- names(rvs$data)
-        #rvs$n_interactions <- input$n_interactions
-        #rvs$int_options <- rep(names(rvs$data), times = rvs$n_interactions)
+        rvs$variables <- names(rvs$data)
         
-        updateSelectInput(inputId = "outcome", choices = names(rvs$data))
-        updateSelectInput(inputId = "predictor", choices = names(rvs$data))
-        #updateSelectInput(inputId = "interaction", choices = names(rvs$data))
+        updateSelectInput(inputId = "outcome", choices = rvs$variables)
+        updateSelectInput(inputId = "predictor", choices = rvs$variables)
+
     })
     
-    output$selectContainer <- renderUI({
-        # Take a dependency on chosen to re-render when an option is selected.
-        chosen()
-        selectInput(inputId = "interaction", label = "Interacting variables",
-                    choices = rvs$choices, multiple = TRUE, selectize = FALSE
+    observe({
+        if(!is.null(input$upload_data)){shinyjs::disable("load_demo_data")}
+        req(input$load_demo_data)
+        rvs$data <- palmerpenguins::penguins
+        rvs$variables <- names(rvs$data)
+        
+        updateSelectInput(inputId = "outcome", choices = rvs$variables)
+        updateSelectInput(inputId = "predictor", choices = rvs$variables)
+        
+    })
+    
+    observeEvent(input$reset_data, {
+        shinyjs::refresh()
+    })
+    
+    output$interaction_vars <- renderUI({
+        # Take a dependency on chosen_vars to re-render when an option is selected.
+        chosen_vars()
+        selectInput(inputId = "interaction", label = "Interacting variables:",
+                    choices = rvs$variables[!rvs$variables %in% input$outcome], multiple = TRUE, selectize = FALSE
         )
     })
     
     observeEvent(input$interaction, {
-        chosen(c(chosen(), input$interaction))
+        chosen_vars(c(chosen_vars(), input$interaction))
     })
-    output$val <- renderPrint(chosen())
+    
+    observeEvent(input$add_interaction, {
+        chosen_vars(c(chosen_vars(), "+"))
+    })
+    
+    observe({
+        rvs$interaction <- process_int_string(chosen_vars())
+    })
+    
+    output$interaction_terms <- renderPrint(
+        HTML("<b> Interaction term(s):</b> <br><br>", rvs$interaction %>% 
+                 stringr::str_replace_all(., pattern = ":", replacement = " ✕ ") %>% 
+                 stringr::str_replace_all(., pattern = "[+]", replacement = "</br> +")
+        )
+    )
     
     # Display data 
     output$display_data <- renderDataTable({
@@ -139,27 +184,29 @@ server <- function(input, output) {
         )
     })
     
+    
     # Run linear model 
     observe({
         
-        req(input$run_analysis, input$predictor)
+        req(input$predictor)
         
-        if(is.null(input$interaction)){
+        if(is.null(rvs$interaction)){
             interaction = ""
-        } else if(stringr::str_sub(input$interaction[length(input$interaction)], -1) == "+") {
+        } else if(stringr::str_sub(rvs$interaction[length(rvs$interaction)], -1) == "+") {
             interaction = ""
-        } else if(check_multi_plus(input$interaction) == TRUE){
+        } else if(check_multi_plus(rvs$interaction) == TRUE){
             interaction == ""
         } else {
-            interaction = paste0("+", 
-                                 process_int_string(input$interaction)
-            )
+            interaction = rvs$interaction
         }
         
+        if(nchar(interaction) == 0){
+            connect = ""
+        } else {connect = "+"}
         
         formula = paste0(
             input$outcome, "~", 
-            paste0(input$predictor, collapse = "+"), 
+            paste0(input$predictor, collapse = "+"), connect,
             interaction
         )
         
@@ -193,21 +240,25 @@ server <- function(input, output) {
         # 
         # })
         
-        output$interaction_terms <- renderUI({
-            HTML(
-                paste0(
+        output$code_box <- renderUI({
+            tags$code(
+                HTML(
+                    '<b># R code for the robust model:</b> <br><br>',
+                    'robustbase::lmrob( <br>
+                    &nbsp formula = ', stringr::str_replace_all(formula, "[+]", " + "),', <br> 
+                    &nbsp data = uploaded_data) <br>
+                    &nbsp setting = "KS2014" <br>
+                    ) <br><br>',
                     
+                    '<b># R code for the OLS model:</b> <br><br>',
+                    'lm( <br>
+                    &nbsp formula = ', stringr::str_replace_all(formula, "[+]", " + "),', <br> 
+                    &nbsp data = uploaded_data) <br>
+                    ) <br><br>'
                 )
             )
         })
         
-        output$debug_box <- renderUI({
-            HTML(
-                paste0(
-                    rvs$int_options
-                )
-            )
-        })
         
     })
     

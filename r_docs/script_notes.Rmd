@@ -184,3 +184,18 @@ rep(c("dog", "course", "+"), 4)
 rep(c(names(rvs$data), "+"), times = rvs$n_interactions)
 ```
 
+```{r}
+predictor <- "time+dogs+"
+
+stringr::str_sub(predictor[length(predictor)], -1) <- ""
+
+
+penguins
+```
+
+```{r}
+vec_1 <- c("a", "b", "c")
+vec_2 <- vec_1[!vec_1 %in% "c"]
+vec_2
+```
+

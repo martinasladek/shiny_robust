@@ -15,6 +15,10 @@ add_double_colon <- function(x){
   stringr::str_replace_all(string = x, pattern = " ", replacement = ":")
 }
 
+add_x <- function(x){
+  stringr::str_replace_all(string = x, pattern = " ", replacement = " ✕ ")
+}
+
 check_multi_plus <- function(interaction_input){
   
   check_multi_plus_tib <- 
@@ -37,5 +41,17 @@ process_int_string <- function(interaction_input){
   
   purrr::map(.x = int_vector, .f = add_double_colon) %>% 
     paste0(., collapse = " + ")
+  
+}
+
+process_int_string_x <- function(interaction_input){
+  
+  int_string = paste0(interaction_input, collapse = " ")
+  
+  int_vector = strsplit(int_string, " [+] ")[[1]] %>% 
+    stringr::str_remove_all(., pattern = "[+][ +]")
+  
+  purrr::map(.x = int_vector, .f = add_x) %>% 
+    paste0(., collapse = " + ") 
   
 }
