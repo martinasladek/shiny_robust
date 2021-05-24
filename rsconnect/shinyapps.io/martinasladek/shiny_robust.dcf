@@ -1,0 +1,13 @@
+name: shiny_robust
+title: shiny_robust
+username:
+account: martinasladek
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 4178890
+bundleId: 4635068
+url: https://martinasladek.shinyapps.io/shiny_robust/
+when: 1621894248.15877
+lastSyncTime: 1621894248.15879
+asMultiple: FALSE
+asStatic: FALSE
